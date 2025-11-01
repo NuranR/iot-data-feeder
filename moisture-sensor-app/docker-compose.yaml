@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  sensor-gateway:
+    build: .
+    restart: unless-stopped
+    # Gives the container access to the host's hardware
+    privileged: true
+    # This makes the container share the Pi's network, so 'localhost' works
+    network_mode: "host"

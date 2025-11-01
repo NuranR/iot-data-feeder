@@ -1,28 +1,50 @@
 const { Gpio } = require('pigpio');
+const axios = require('axios');
 
-// Use GPIO 17 (physical pin 11)
-const sensorPin = new Gpio(17, {
+const SENSOR_PIN = 17;
+const LOG_INTERVAL_MS = 10000; 
+const BLOCKCHAIN_API_URL = 'http://localhost:3001/transact';
+const SENSOR_ID = 'pi-moisture-sensor-01'; 
+
+// Initialize the Sensor
+const sensorPin = new Gpio(SENSOR_PIN, {
     mode: Gpio.INPUT,
-    pullUpDown: Gpio.PUD_UP, // Use an internal pull-up resistor
+    pullUpDown: Gpio.PUD_UP,
 });
 
-const LOG_INTERVAL_MS = 1000;
+console.log('Sensor gateway started.');
 
-console.log('Soil Moisture Sensor is active.');
+const sendSensorTransaction = async () => {
+    try {
+        const level = sensorPin.digitalRead(); // Read the current sensor state
+        const status = (level === 0) ? 'wet' : 'dry'; // Determine status
+        const timestamp = new Date().toISOString();
 
-setInterval(() => {
-    const level = sensorPin.digitalRead(); // Actively read the pin's current state
-    const timestamp = new Date().toLocaleTimeString();
+        const transactionData = {
+            sensor_id: SENSOR_ID,
+            reading: {
+                type: "moisture",
+                value: status, // The value is the string "wet" or "dry"
+                unit: "state"
+            },
+            metadata: {
+                timestamp: timestamp,
+                gatewayId: "raspberry-pi-3"
+            }
+        };
 
-    if (level === 0) {
-        console.log(`[${timestamp}] Status: Wet!`);
-    } else {
-        console.log(`[${timestamp}] Status: Dry`);
+        await axios.post(BLOCKCHAIN_API_URL, transactionData);
+
+        console.log(`[${new Date().toLocaleTimeString()}] Transaction sent successfully! Status: ${status}`);
+
+    } catch (error) {
+        console.error(`[${new Date().toLocaleTimeString()}] Failed to send transaction:`, error.message);
     }
-}, LOG_INTERVAL_MS);
+};
 
+setInterval(sendSensorTransaction, LOG_INTERVAL_MS);
 
-// gracefully exit on CTRL+C
+// Graceful exit on CTRL+C
 process.on('SIGINT', () => {
     console.log('\nExiting program.');
     process.exit();
